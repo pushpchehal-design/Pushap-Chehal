@@ -94,6 +94,10 @@
 
     <div class="row">
       <div>
+        <label for="num3">Third number</label>
+        <input id="num3" type="number" placeholder="e.g. 3" />
+      </div>
+      <div>
         <label for="op">Operation</label>
         <select id="op">
           <option value="add">Add (+)</option>
@@ -137,16 +141,18 @@
     document.getElementById('calculateBtn').addEventListener('click', function () {
       const n1 = parseNumber(document.getElementById('num1').value);
       const n2 = parseNumber(document.getElementById('num2').value);
+      const n3 = parseNumber(document.getElementById('num3').value);
       const op = document.getElementById('op').value;
       const resultBox = document.getElementById('result');
 
-      if (n1 === null || n2 === null) {
-        resultBox.innerHTML = '<span class="error">Please enter valid numbers.</span>';
+      if (n1 === null || n2 === null || n3 === null) {
+        resultBox.innerHTML = '<span class="error">Please enter valid numbers in all fields.</span>';
         return;
       }
 
       try {
-        const ans = calculate(n1, n2, op);
+        const first = calculate(n1, n2, op);
+        const ans = calculate(first, n3, op);
         resultBox.textContent = `Result: ${ans}`;
       } catch (err) {
         resultBox.innerHTML = `<span class="error">${err.message}</span>`;

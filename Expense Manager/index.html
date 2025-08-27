@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Expense Manager</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 24px;
+      background: #f7f7f8;
+      color: #1f2328;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+      padding: 20px;
+    }
+    h1 {
+      font-size: 22px;
+      margin: 0 0 12px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .card {
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 16px;
+      background: #fafafa;
+    }
+    .card h2 {
+      font-size: 16px;
+      margin: 0 0 12px;
+    }
+    label {
+      display: block;
+      font-size: 12px;
+      color: #5a6472;
+      margin-bottom: 6px;
+    }
+    input, select, button {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 12px;
+      border: 1px solid #d0d7de;
+      border-radius: 8px;
+      background: #fff;
+      font-size: 14px;
+    }
+    input:focus, select:focus, button:focus {
+      outline: none;
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    }
+    button.primary {
+      background: #2563eb;
+      color: #fff;
+      border: 1px solid #1e4fd6;
+      cursor: pointer;
+    }
+    button.primary:hover { background: #1e4fd6; }
+    button.ghost { background: #fff; cursor: pointer; }
+
+    .row { display: flex; gap: 12px; margin-bottom: 12px; }
+    .row > * { flex: 1; }
+
+    .list { display: grid; gap: 8px; }
+    .item { display: grid; grid-template-columns: 2fr 1fr auto; gap: 8px; align-items: end; }
+
+    .report { margin-top: 20px; border-top: 1px dashed #e5e7eb; padding-top: 16px; }
+    .totals { display: flex; gap: 12px; margin-bottom: 12px; }
+    .totals > div { flex: 1; background: #f1f5f9; border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px; font-weight: 600; }
+
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 8px 10px; border-bottom: 1px solid #eee; text-align: left; }
+    th { background: #f8fafc; font-size: 13px; }
+    .right { text-align: right; }
+    .muted { color: #64748b; font-weight: 500; }
+    .positive { color: #166534; }
+    .negative { color: #b91c1c; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Expense Manager</h1>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Income</h2>
+        <div id="incomeList" class="list"></div>
+        <div class="row">
+          <button id="addIncome" class="ghost" type="button">+ Add income source</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Expenses</h2>
+        <div id="expenseList" class="list"></div>
+        <div class="row">
+          <button id="addExpense" class="ghost" type="button">+ Add expense</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="row" style="margin-top: 16px;">
+      <button id="calculate" class="primary" type="button">Generate Report</button>
+      <button id="reset" class="ghost" type="button">Reset</button>
+    </div>
+
+    <div id="report" class="report" hidden>
+      <div class="totals">
+        <div>Total Income: <span id="totalIncome">0</span></div>
+        <div>Total Expense: <span id="totalExpense">0</span></div>
+        <div>Savings: <span id="savings" class="positive">0</span></div>
+      </div>
+
+      <div class="row">
+        <div class="card" style="flex:1;">
+          <h2>Income Breakdown</h2>
+          <table id="incomeTable">
+            <thead>
+              <tr><th>Category</th><th class="right">Amount</th><th class="right">% of Income</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="card" style="flex:1;">
+          <h2>Expense Breakdown</h2>
+          <table id="expenseTable">
+            <thead>
+              <tr><th>Category</th><th class="right">Amount</th><th class="right">% of Income</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function createItemRow(prefix, defaults) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'item';
+
+      const nameId = `${prefix}-name-${crypto.randomUUID()}`;
+      const amountId = `${prefix}-amount-${crypto.randomUUID()}`;
+
+      wrapper.innerHTML = `
+        <div>
+          <label for="${nameId}">Category</label>
+          <input id="${nameId}" type="text" placeholder="e.g. Salary" value="${defaults.name || ''}">
+        </div>
+        <div>
+          <label for="${amountId}">Amount</label>
+          <input id="${amountId}" type="number" min="0" step="0.01" placeholder="0.00" value="${defaults.amount || ''}">
+        </div>
+        <div>
+          <button type="button" class="ghost remove">Remove</button>
+        </div>
+      `;
+
+      wrapper.querySelector('.remove').addEventListener('click', () => wrapper.remove());
+
+      return wrapper;
+    }
+
+    function parseAmount(value) {
+      const n = Number(value);
+      return Number.isFinite(n) && n >= 0 ? n : 0;
+    }
+
+    function sum(items) {
+      return items.reduce((acc, item) => acc + parseAmount(item.amount), 0);
+    }
+
+    function collectItems(listEl) {
+      const rows = Array.from(listEl.querySelectorAll('.item'));
+      return rows.map(row => {
+        const [nameInput, amountInput] = row.querySelectorAll('input');
+        return { name: nameInput.value.trim() || 'Unnamed', amount: amountInput.value };
+      });
+    }
+
+    function percent(part, total) {
+      if (total <= 0) return 0;
+      return Math.round((part / total) * 1000) / 10; // one decimal
+    }
+
+    function renderTable(tbody, items, totalIncome) {
+      tbody.innerHTML = '';
+      for (const item of items) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${item.name}</td>
+          <td class="right">${parseAmount(item.amount).toFixed(2)}</td>
+          <td class="right muted">${percent(parseAmount(item.amount), totalIncome).toFixed(1)}%</td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    const incomeList = document.getElementById('incomeList');
+    const expenseList = document.getElementById('expenseList');
+
+    document.getElementById('addIncome').addEventListener('click', () => {
+      incomeList.appendChild(createItemRow('income', { name: '', amount: '' }));
+    });
+
+    document.getElementById('addExpense').addEventListener('click', () => {
+      expenseList.appendChild(createItemRow('expense', { name: '', amount: '' }));
+    });
+
+    // Seed with some handy defaults
+    incomeList.appendChild(createItemRow('income', { name: 'Salary', amount: '' }));
+    incomeList.appendChild(createItemRow('income', { name: 'Side Hustle', amount: '' }));
+
+    expenseList.appendChild(createItemRow('expense', { name: 'Rent', amount: '' }));
+    expenseList.appendChild(createItemRow('expense', { name: 'EMI', amount: '' }));
+    expenseList.appendChild(createItemRow('expense', { name: 'Grocery', amount: '' }));
+    expenseList.appendChild(createItemRow('expense', { name: 'Food', amount: '' }));
+
+    document.getElementById('reset').addEventListener('click', () => {
+      incomeList.innerHTML = '';
+      expenseList.innerHTML = '';
+      document.getElementById('report').hidden = true;
+      incomeList.appendChild(createItemRow('income', { name: 'Salary', amount: '' }));
+      expenseList.appendChild(createItemRow('expense', { name: 'Rent', amount: '' }));
+    });
+
+    document.getElementById('calculate').addEventListener('click', () => {
+      const incomes = collectItems(incomeList);
+      const expenses = collectItems(expenseList);
+
+      const totalIncome = sum(incomes);
+      const totalExpense = sum(expenses);
+      const savings = totalIncome - totalExpense;
+
+      document.getElementById('totalIncome').textContent = totalIncome.toFixed(2);
+      document.getElementById('totalExpense').textContent = totalExpense.toFixed(2);
+      const savingsEl = document.getElementById('savings');
+      savingsEl.textContent = savings.toFixed(2);
+      savingsEl.className = savings >= 0 ? 'positive' : 'negative';
+
+      renderTable(document.querySelector('#incomeTable tbody'), incomes, totalIncome);
+      renderTable(document.querySelector('#expenseTable tbody'), expenses, totalIncome);
+
+      document.getElementById('report').hidden = false;
+    });
+  </script>
+</body>
+</html>

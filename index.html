@@ -429,15 +429,13 @@
       return dark ? {
         bg: '#0f172a',
         axis: '#93a4c5',
-        bar: '#60a5fa',
-        barAlt: '#34d399',
-        label: '#e5e7eb'
+        label: '#e5e7eb',
+        palette: ['#60a5fa','#34d399','#f472b6','#fbbf24','#a78bfa','#f87171','#22d3ee']
       } : {
         bg: '#ffffff',
         axis: '#64748b',
-        bar: '#2563eb',
-        barAlt: '#16a34a',
-        label: '#1f2328'
+        label: '#1f2328',
+        palette: ['#2563eb','#16a34a','#db2777','#d97706','#6d28d9','#dc2626','#0891b2']
       };
     }
 
@@ -477,7 +475,7 @@
         const x = padding.left + idx * (barW + gap);
         const h = maxVal > 0 ? (val / maxVal) * (chartH - 4) : 0;
         const y = padding.top + (chartH - h);
-        ctx.fillStyle = idx % 2 === 0 ? colors.bar : colors.barAlt;
+        ctx.fillStyle = colors.palette[idx % colors.palette.length];
         ctx.fillRect(x, y, barW, h);
 
         // Label
@@ -487,6 +485,19 @@
         ctx.textBaseline = 'top';
         const label = labels[idx].length > 12 ? labels[idx].slice(0, 12) + '…' : labels[idx];
         ctx.fillText(label, x + barW / 2, padding.top + chartH + 6);
+
+        // Value on bar
+        ctx.fillStyle = colors.label;
+        ctx.textBaseline = 'bottom';
+        const valueText = val.toFixed(2);
+        const textY = y - 4;
+        // if bar too small, draw value inside the bar at the top
+        if (h < 18) {
+          ctx.textBaseline = 'top';
+          ctx.fillText(valueText, x + barW / 2, y + 2);
+        } else {
+          ctx.fillText(valueText, x + barW / 2, textY);
+        }
       });
     }
   </script>

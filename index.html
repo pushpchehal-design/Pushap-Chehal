@@ -163,6 +163,25 @@
           </table>
         </div>
       </div>
+      <div class="card" style="margin-top:16px;">
+        <h2>Insights</h2>
+        <div id="smartAlert" class="negative" hidden></div>
+        <div class="totals">
+          <div>Savings Rate: <span id="kpiSavingsRate">0%</span></div>
+          <div>Expense/Income: <span id="kpiExpenseRatio">0%</span></div>
+          <div>Top Expense: <span id="kpiTopExpense">—</span></div>
+        </div>
+        <div class="row">
+          <div class="card" style="flex:1;">
+            <h2 style="margin-bottom:8px;">Income Chart</h2>
+            <canvas id="incomeChart" height="160"></canvas>
+          </div>
+          <div class="card" style="flex:1;">
+            <h2 style="margin-bottom:8px;">Expense Chart</h2>
+            <canvas id="expenseChart" height="160"></canvas>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -232,6 +251,7 @@
 
     const incomeList = document.getElementById('incomeList');
     const expenseList = document.getElementById('expenseList');
+    let lastComputed = null; // cache for redraws
 
     document.getElementById('addIncome').addEventListener('click', () => {
       incomeList.appendChild(createItemRow('income', { name: '', amount: '' }));
@@ -306,6 +326,9 @@
 
       document.getElementById('report').hidden = false;
       saveState();
+
+      lastComputed = { incomes, expenses, totalIncome, totalExpense, savings };
+      updateInsights(incomes, expenses, totalIncome, totalExpense, savings);
     });
 
     // Persist on input changes and item removals
@@ -318,6 +341,15 @@
     document.getElementById('themeToggle').addEventListener('click', () => {
       document.body.classList.toggle('dark');
       saveState();
+      if (!document.getElementById('report').hidden && lastComputed) {
+        updateInsights(
+          lastComputed.incomes,
+          lastComputed.expenses,
+          lastComputed.totalIncome,
+          lastComputed.totalExpense,
+          lastComputed.savings
+        );
+      }
     });
 
     // Export CSV
@@ -359,6 +391,104 @@
         document.getElementById('calculate').click();
       }
     });
+
+    // ---------- Insights & Charts ----------
+    function updateInsights(incomes, expenses, totalIncome, totalExpense, savings) {
+      const savingsRate = totalIncome > 0 ? (savings / totalIncome) * 100 : 0;
+      const expenseRatio = totalIncome > 0 ? (totalExpense / totalIncome) * 100 : 0;
+      document.getElementById('kpiSavingsRate').textContent = `${savingsRate.toFixed(1)}%`;
+      document.getElementById('kpiExpenseRatio').textContent = `${expenseRatio.toFixed(1)}%`;
+
+      const sortedExpenses = [...expenses].sort((a, b) => parseAmount(b.amount) - parseAmount(a.amount));
+      const top = sortedExpenses[0];
+      document.getElementById('kpiTopExpense').textContent = top ? `${top.name} (${parseAmount(top.amount).toFixed(2)})` : '—';
+
+      // Smart alert: if no or negative savings and Shopping exists
+      const hasShopping = expenses.some(e => (e.name || '').toLowerCase().includes('shop'));
+      const smartAlert = document.getElementById('smartAlert');
+      if (hasShopping && savings <= 0) {
+        smartAlert.hidden = false;
+        smartAlert.textContent = 'Tip: Savings are at or below zero. Consider reducing Shopping to improve savings.';
+      } else if (savings <= 0) {
+        smartAlert.hidden = false;
+        smartAlert.textContent = 'Tip: Savings are at or below zero. Review discretionary expenses to improve savings.';
+      } else if (hasShopping && savings > 0 && expenseRatio > 60) {
+        smartAlert.hidden = false;
+        smartAlert.textContent = 'Notice: Expenses are high relative to income. Trimming Shopping may boost your savings rate.';
+      } else {
+        smartAlert.hidden = true;
+      }
+
+      // Draw charts
+      drawBarChart(document.getElementById('incomeChart'), incomes);
+      drawBarChart(document.getElementById('expenseChart'), expenses);
+    }
+
+    function getThemeColors() {
+      const dark = document.body.classList.contains('dark');
+      return dark ? {
+        bg: '#0f172a',
+        axis: '#93a4c5',
+        bar: '#60a5fa',
+        barAlt: '#34d399',
+        label: '#e5e7eb'
+      } : {
+        bg: '#ffffff',
+        axis: '#64748b',
+        bar: '#2563eb',
+        barAlt: '#16a34a',
+        label: '#1f2328'
+      };
+    }
+
+    function drawBarChart(canvas, items) {
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const colors = getThemeColors();
+      const width = canvas.width = canvas.clientWidth; // ensure crisp redraw
+      const height = canvas.height; // set in HTML
+
+      // Clear
+      ctx.fillStyle = colors.bg;
+      ctx.fillRect(0, 0, width, height);
+
+      const values = items.map(i => parseAmount(i.amount));
+      const labels = items.map(i => i.name || 'Unnamed');
+      const maxVal = Math.max(1, ...values);
+
+      const padding = { top: 10, right: 8, bottom: 28, left: 28 };
+      const chartW = width - padding.left - padding.right;
+      const chartH = height - padding.top - padding.bottom;
+
+      // Axis
+      ctx.strokeStyle = colors.axis;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(padding.left, padding.top);
+      ctx.lineTo(padding.left, padding.top + chartH);
+      ctx.lineTo(padding.left + chartW, padding.top + chartH);
+      ctx.stroke();
+
+      const barCount = values.length;
+      const gap = 8;
+      const barW = barCount > 0 ? (chartW - gap * (barCount - 1)) / Math.max(1, barCount) : chartW;
+
+      values.forEach((val, idx) => {
+        const x = padding.left + idx * (barW + gap);
+        const h = maxVal > 0 ? (val / maxVal) * (chartH - 4) : 0;
+        const y = padding.top + (chartH - h);
+        ctx.fillStyle = idx % 2 === 0 ? colors.bar : colors.barAlt;
+        ctx.fillRect(x, y, barW, h);
+
+        // Label
+        ctx.fillStyle = colors.label;
+        ctx.font = '12px system-ui';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        const label = labels[idx].length > 12 ? labels[idx].slice(0, 12) + '…' : labels[idx];
+        ctx.fillText(label, x + barW / 2, padding.top + chartH + 6);
+      });
+    }
   </script>
 </body>
 </html>
